@@ -1,7 +1,3 @@
-import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
-import { extname, join, normalize } from 'node:path';
-
 import {
   addDrink,
   approvePoolMatch,
@@ -30,7 +26,6 @@ import {
   listMembers,
   listPoolMatches,
   listWeeklyPoolMatches,
-  loginByPhone,
   logout,
   rejectPoolMatch,
   removeDrink,
@@ -45,145 +40,115 @@ import {
   updateNotice,
   updatePoolMatch,
   upsertAttendance
-} from '../domain/model.js';
+} from './domain/model.js';
 
-const MIME_TYPES = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.svg': 'image/svg+xml; charset=utf-8'
-};
+const STORAGE_KEY = 'cdt_static_state_v1';
+const PHONE_HASH_SALT = 'clube-das-tercas-static-phone-v1';
 
-export function createHttpServer({ state = createInitialState(), persist = false, saveState = async () => {}, staticRoot = 'public' } = {}) {
-  async function persistIfNeeded() {
-    if (persist) {
-      await saveState(state);
-    }
-  }
+let statePromise = null;
 
-  return createServer(async (request, response) => {
-    try {
-      const url = new URL(request.url, 'http://localhost');
-      if (request.method === 'OPTIONS') {
-        return sendJson(response, 204, null);
-      }
-      if (!url.pathname.startsWith('/api/')) {
-        return serveStatic(response, staticRoot, url.pathname);
-      }
-
-      const body = await readJsonBody(request);
-      const result = await handleApiRequest({
-        state,
-        method: request.method,
-        pathname: url.pathname,
-        searchParams: url.searchParams,
-        body,
-        request,
-        authorization: request.headers.authorization ?? '',
-        persist: persistIfNeeded
-      });
-      return sendJson(response, 200, result);
-    } catch (error) {
-      return sendJson(response, error.statusCode ?? 500, {
-        error: error.statusCode ? error.message : 'Erro interno do servidor.'
-      });
-    }
-  });
+export async function api(path, options = {}) {
+  const state = await getClientState();
+  const method = options.method || 'GET';
+  const url = new URL(path, window.location.origin);
+  const body = options.body || {};
+  const result = await dispatchRoute(state, method, url.pathname, url.searchParams, body);
+  return clone(result);
 }
 
-export async function handleApiRequest({
-  state,
-  method,
-  pathname,
-  searchParams = new URLSearchParams(),
-  body = {},
-  authorization = '',
-  request = null,
-  persist = async () => {}
-}) {
+export function exportClientState() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  return raw ? JSON.parse(raw) : null;
+}
+
+export async function importClientState(nextState) {
+  if (!nextState?.members || !nextState?.counters) {
+    throw new Error('Arquivo de backup invalido.');
+  }
+  const sanitized = await sanitizeState(nextState);
+  saveClientState(sanitized);
+  statePromise = Promise.resolve(sanitized);
+}
+
+async function getClientState() {
+  statePromise ??= loadClientState();
+  return statePromise;
+}
+
+async function loadClientState() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) {
+    return sanitizeState(JSON.parse(saved));
+  }
+  try {
+    const response = await fetch(new URL('./data/app-state.json', import.meta.url));
+    if (response.ok) {
+      const seed = await response.json();
+      const sanitized = await sanitizeState(seed);
+      saveClientState(sanitized);
+      return sanitized;
+    }
+  } catch {}
+  const fallback = await sanitizeState(createInitialState(new Date().toISOString()));
+  saveClientState(fallback);
+  return fallback;
+}
+
+function saveClientState(state) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+async function dispatchRoute(state, method, pathname, query, body) {
   const route = matchRoute(method, pathname);
-  if (!route) {
-    throw httpError('Rota nao encontrada.', 404);
-  }
-  const query = searchParams instanceof URLSearchParams ? searchParams : new URLSearchParams(searchParams);
-  const routeRequest = request ?? { headers: { authorization } };
-  const isPublic = route.public === true;
-  const currentMember = isPublic ? null : requireAuth(state, routeRequest);
-  const result = await route.handler({
-    state,
-    body,
-    params: route.params,
-    query,
-    currentMember,
-    request: routeRequest
-  });
-  if (route.mutates) {
-    await persist(state);
-  }
+  if (!route) throw httpError('Rota nao encontrada.', 404);
+  const currentMember = route.public ? null : requireAuth(state);
+  const result = await route.handler({ state, body, params: route.params, query, currentMember });
+  if (route.mutates) saveClientState(state);
   return result;
 }
 
 const ROUTES = [
-  route('POST', '/api/auth/login', true, true, ({ state, body }) => loginByPhone(state, body.phone)),
-  route('POST', '/api/auth/logout', false, true, ({ state, request }) => ({ loggedOut: logout(state, readBearerToken(request)) })),
+  route('POST', '/api/auth/login', true, true, async ({ state, body }) => loginByPhoneHash(state, body.phone)),
+  route('POST', '/api/auth/logout', false, true, ({ state }) => ({ loggedOut: logout(state, localStorage.getItem('cdt_token')) })),
   route('GET', '/api/auth/me', false, false, ({ currentMember }) => currentMember),
   route('GET', '/api/home', false, false, ({ state, currentMember }) => getHomeData(state, currentMember.id)),
-
   route('GET', '/api/members', false, false, ({ state, currentMember, query }) => listMembers(state, currentMember.id, {
     includeInactive: query.get('includeInactive') === 'true',
     all: query.get('all') === 'true'
   })),
-  route('POST', '/api/members', false, true, ({ state, currentMember, body }) => createMember(state, currentMember.id, body)),
-  route('GET', '/api/members/:id', false, false, ({ state, params }) => state.members.find((member) => member.id === Number(params.id)) ?? null),
-  route('PUT', '/api/members/:id', false, true, ({ state, currentMember, params, body }) => updateMember(state, currentMember.id, params.id, body)),
+  route('POST', '/api/members', false, true, async ({ state, currentMember, body }) => {
+    const prepared = await prepareMemberPayload(state, body);
+    const member = createMember(state, currentMember.id, prepared.domain);
+    applyPhoneCrypto(member, prepared);
+    return member;
+  }),
+  route('PUT', '/api/members/:id', false, true, async ({ state, currentMember, params, body }) => {
+    if (body.phone) {
+      const prepared = await prepareMemberPayload(state, body, Number(params.id));
+      const member = updateMember(state, currentMember.id, params.id, prepared.domain);
+      applyPhoneCrypto(member, prepared);
+      return member;
+    }
+    return updateMember(state, currentMember.id, params.id, body);
+  }),
   route('PATCH', '/api/members/:id/status', false, true, ({ state, currentMember, params, body }) => updateMember(state, currentMember.id, params.id, { isActive: body.isActive })),
-
   route('GET', '/api/club-tuesdays', false, true, ({ state, query }) => listClubTuesdays(state, {
     monthsAhead: query.get('monthsAhead') ? Number(query.get('monthsAhead')) : 12
   })),
   route('GET', '/api/club-tuesdays/current', false, false, ({ state }) => getCurrentTuesday(state)),
-  route('POST', '/api/club-tuesdays', false, true, ({ state, currentMember, body }) => {
-    const exists = state.clubTuesdays.find((item) => item.date === body.date);
-    if (exists) return exists;
-    if (currentMember.role !== 'admin') throw httpError('Sem permissao de administrador.', 403);
-    const tuesday = {
-      id: state.counters.clubTuesdays++,
-      date: body.date,
-      status: body.status ?? 'open',
-      createdAt: state.nowIso,
-      updatedAt: state.nowIso
-    };
-    state.clubTuesdays.push(tuesday);
-    return tuesday;
-  }),
   route('PATCH', '/api/club-tuesdays/:id/status', false, true, ({ state, currentMember, params, body }) => setTuesdayStatus(state, currentMember.id, params.id, body.status)),
-
   route('GET', '/api/attendance/:clubTuesdayId', false, false, ({ state, currentMember, params }) => ({
     rows: listAttendanceForTuesday(state, currentMember.id, params.clubTuesdayId),
     summary: summarizeAttendance(state, params.clubTuesdayId)
   })),
   route('POST', '/api/attendance', false, true, ({ state, currentMember, body }) => upsertAttendance(state, currentMember.id, body)),
-  route('PUT', '/api/attendance/:id', false, true, ({ state, currentMember, params, body }) => {
-    const existing = state.attendance.find((item) => item.id === Number(params.id));
-    if (!existing) throw httpError('Presenca nao encontrada.', 404);
-    return upsertAttendance(state, currentMember.id, { ...existing, ...body, memberId: existing.memberId });
-  }),
-
   route('GET', '/api/notices/active', false, false, ({ state, query }) => listActiveNotices(state, query.get('clubTuesdayId'))),
   route('GET', '/api/notices', false, false, ({ state }) => state.notices),
   route('POST', '/api/notices', false, true, ({ state, currentMember, body }) => createNotice(state, currentMember.id, body)),
   route('PUT', '/api/notices/:id', false, true, ({ state, currentMember, params, body }) => updateNotice(state, currentMember.id, params.id, body)),
   route('PATCH', '/api/notices/:id/status', false, true, ({ state, currentMember, params, body }) => updateNotice(state, currentMember.id, params.id, { status: body.status })),
-
   route('GET', '/api/dinner-teams/:clubTuesdayId', false, false, ({ state, currentMember, params }) => getDinnerTeamForTuesday(state, params.clubTuesdayId, currentMember.id)),
   route('POST', '/api/dinner-teams', false, true, ({ state, currentMember, body }) => createDinnerTeam(state, currentMember.id, body)),
-  route('PUT', '/api/dinner-teams/:id', false, true, ({ state, currentMember, params, body }) => {
-    const existing = state.dinnerTeams.find((item) => item.id === Number(params.id));
-    if (!existing) throw httpError('Escala nao encontrada.', 404);
-    return createDinnerTeam(state, currentMember.id, { ...existing, ...body, clubTuesdayId: existing.clubTuesdayId });
-  }),
-
   route('GET', '/api/pool/championships', false, false, ({ state }) => state.poolChampionships),
   route('POST', '/api/pool/championships', false, true, ({ state, currentMember, body }) => createPoolChampionship(state, currentMember.id, body)),
   route('GET', '/api/pool/teams', false, false, ({ state, query }) => state.poolTeams.filter((team) => !query.get('championshipId') || team.championshipId === Number(query.get('championshipId')))),
@@ -197,7 +162,6 @@ const ROUTES = [
   route('POST', '/api/pool/matches/:id/approve', false, true, ({ state, currentMember, params }) => approvePoolMatch(state, currentMember.id, params.id)),
   route('POST', '/api/pool/matches/:id/reject', false, true, ({ state, currentMember, params }) => rejectPoolMatch(state, currentMember.id, params.id)),
   route('GET', '/api/pool/ranking/:championshipId', false, false, ({ state, params }) => getPoolRanking(state, params.championshipId)),
-
   route('GET', '/api/drinks/:clubTuesdayId', false, false, ({ state, currentMember, params }) => listDrinksForTuesday(state, currentMember.id, params.clubTuesdayId)),
   route('GET', '/api/drinks/rows/:clubTuesdayId', false, false, ({ state, currentMember, params }) => listDrinkRowsForTuesday(state, currentMember.id, params.clubTuesdayId)),
   route('POST', '/api/drinks', false, true, ({ state, currentMember, body }) => addDrink(state, currentMember.id, body)),
@@ -205,7 +169,6 @@ const ROUTES = [
   route('DELETE', '/api/drinks/:id', false, true, ({ state, currentMember, params }) => removeDrink(state, currentMember.id, params.id)),
   route('GET', '/api/drinks/logs/:clubTuesdayId', false, false, ({ state, currentMember, params }) => listDrinkLogsForTuesday(state, currentMember.id, params.clubTuesdayId)),
   route('GET', '/api/drinks/reports/monthly', false, false, ({ state, currentMember, query }) => getReports(state, currentMember.id, query.get('month') ?? state.nowIso.slice(0, 7)).drinks),
-
   route('GET', '/api/charges/me', false, false, ({ state, currentMember }) => listChargesForUser(state, currentMember.id)),
   route('GET', '/api/charges', false, false, ({ state, currentMember, query }) => listChargesForUser(state, currentMember.id, {
     memberId: query.get('memberId'),
@@ -215,7 +178,6 @@ const ROUTES = [
   route('POST', '/api/charges', false, true, ({ state, currentMember, body }) => createCharge(state, currentMember.id, body)),
   route('PUT', '/api/charges/:id', false, true, ({ state, currentMember, params, body }) => updateCharge(state, currentMember.id, params.id, body)),
   route('PATCH', '/api/charges/:id/status', false, true, ({ state, currentMember, params, body }) => setChargeStatus(state, currentMember.id, params.id, body.status)),
-
   route('GET', '/api/reports/attendance', false, false, ({ state, query }) => summarizeAttendance(state, query.get('clubTuesdayId') ?? getCurrentTuesday(state).id)),
   route('GET', '/api/reports/drinks', false, false, ({ state, currentMember, query }) => getReports(state, currentMember.id, query.get('month') ?? state.nowIso.slice(0, 7)).drinks),
   route('GET', '/api/reports/charges', false, false, ({ state, currentMember, query }) => getReports(state, currentMember.id, query.get('month') ?? state.nowIso.slice(0, 7)).charges),
@@ -245,77 +207,82 @@ function matchRoute(method, pathname) {
   return null;
 }
 
-function requireAuth(state, request) {
-  const token = readBearerToken(request);
-  if (!token) {
-    throw httpError('Autenticacao obrigatoria.', 401);
-  }
-  const member = getSessionMember(state, token);
-  if (!member) {
-    throw httpError('Sessao invalida.', 401);
-  }
+async function loginByPhoneHash(state, phone) {
+  const hash = await hashPhone(phone);
+  const member = state.members.find((item) => item.phoneHash === hash);
+  if (!member) throw httpError('Telefone cadastrado nao encontrado. Procure um administrador.', 401);
+  if (!member.isActive) throw httpError('Membro inativo. Procure um administrador.', 403);
+  const session = {
+    id: state.counters.sessions++,
+    token: `session-${member.id}-${Date.now()}-${state.counters.sessions}`,
+    memberId: member.id,
+    createdAt: new Date().toISOString()
+  };
+  state.sessions.push(session);
+  saveClientState(state);
+  return { member, token: session.token };
+}
+
+function requireAuth(state) {
+  const member = getSessionMember(state, localStorage.getItem('cdt_token'));
+  if (!member) throw httpError('Sessao invalida.', 401);
   return member;
 }
 
-function readBearerToken(request) {
-  const header = request.headers.authorization ?? '';
-  return header.startsWith('Bearer ') ? header.slice('Bearer '.length) : null;
+async function prepareMemberPayload(state, data, ignoredMemberId = null) {
+  const phoneHash = await hashPhone(data.phone);
+  const duplicate = state.members.find((member) => (
+    member.id !== ignoredMemberId &&
+    member.isActive &&
+    data.isActive !== false &&
+    member.phoneHash === phoneHash
+  ));
+  if (duplicate) throw httpError('Ja existe um membro ativo com este telefone.', 409);
+  return {
+    phoneHash,
+    phoneMasked: maskPhone(data.phone),
+    domain: { ...data, phone: normalizePhone(data.phone) }
+  };
 }
 
-async function readJsonBody(request) {
-  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) {
-    return {};
-  }
-  const chunks = [];
-  for await (const chunk of request) {
-    chunks.push(chunk);
-  }
-  const raw = Buffer.concat(chunks).toString('utf8');
-  if (!raw) {
-    return {};
-  }
-  try {
-    return JSON.parse(raw);
-  } catch {
-    throw httpError('JSON invalido.', 400);
-  }
+function applyPhoneCrypto(member, prepared) {
+  member.phoneHash = prepared.phoneHash;
+  member.phone = prepared.phoneMasked;
 }
 
-async function serveStatic(response, staticRoot, pathname) {
-  const safePath = normalize(pathname === '/' ? '/index.html' : pathname).replace(/^(\.\.[/\\])+/, '');
-  const filePath = join(process.cwd(), staticRoot, safePath);
-  const rootPath = join(process.cwd(), staticRoot);
-  if (!filePath.startsWith(rootPath)) {
-    return sendJson(response, 403, { error: 'Acesso negado.' });
-  }
-  try {
-    const bytes = await readFile(filePath);
-    response.writeHead(200, {
-      'content-type': MIME_TYPES[extname(filePath)] ?? 'application/octet-stream',
-      'cache-control': 'no-store'
-    });
-    response.end(bytes);
-  } catch {
-    const indexPath = join(process.cwd(), staticRoot, 'index.html');
-    try {
-      const bytes = await readFile(indexPath);
-      response.writeHead(200, { 'content-type': MIME_TYPES['.html'], 'cache-control': 'no-store' });
-      response.end(bytes);
-    } catch {
-      sendJson(response, 404, { error: 'Arquivo nao encontrado.' });
+async function sanitizeState(rawState) {
+  const state = clone(rawState);
+  for (const member of state.members || []) {
+    if (!member.phoneHash && member.phone) {
+      member.phoneHash = await hashPhone(member.phone);
     }
+    member.phone = maskPhone(member.phone);
   }
+  state.sessions ??= [];
+  state.counters ??= {};
+  state.counters.sessions ??= 1;
+  return state;
 }
 
-function sendJson(response, statusCode, payload) {
-  response.writeHead(statusCode, {
-    'content-type': 'application/json; charset=utf-8',
-    'access-control-allow-origin': '*',
-    'access-control-allow-methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
-    'access-control-allow-headers': 'content-type,authorization',
-    'cache-control': 'no-store'
-  });
-  response.end(statusCode === 204 ? '' : JSON.stringify(payload));
+async function hashPhone(phone) {
+  const normalized = normalizePhone(phone);
+  const data = new TextEncoder().encode(`${PHONE_HASH_SALT}:${normalized}`);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function maskPhone(phone) {
+  const normalized = normalizePhone(phone);
+  if (!normalized) return '';
+  return `***${normalized.slice(-4)}`;
+}
+
+function normalizePhone(phone) {
+  return String(phone ?? '').replace(/\D/g, '');
+}
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
 }
 
 function httpError(message, statusCode) {

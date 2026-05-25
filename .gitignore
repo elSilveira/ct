@@ -1,4 +1,6 @@
-data/
+/data/
 node_modules/
+.next/
+out/
 .env
 .DS_Store

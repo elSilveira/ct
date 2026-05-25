@@ -1,6 +1,6 @@
+import { api, exportClientState, importClientState } from './client-api.js';
+
 const app = document.querySelector('#app');
-const API_BASE = String(window.CDT_API_BASE || '').replace(/\/$/, '');
-const IS_GITHUB_PAGES_WITHOUT_API = !API_BASE && window.location.hostname.endsWith('github.io');
 
 const state = {
   token: localStorage.getItem('cdt_token'),
@@ -57,29 +57,7 @@ async function init() {
   }
 }
 
-async function api(path, options = {}) {
-  if (IS_GITHUB_PAGES_WITHOUT_API) {
-    throw new Error('Backend nao configurado. Defina CDT_API_BASE nas variaveis do repositorio com a URL publica da API.');
-  }
-  const response = await fetch(`${API_BASE}${path}`, {
-    method: options.method || 'GET',
-    headers: {
-      'content-type': 'application/json',
-      ...(state.token ? { authorization: `Bearer ${state.token}` } : {})
-    },
-    body: options.body ? JSON.stringify(options.body) : undefined
-  });
-  const payload = await response.json();
-  if (!response.ok) {
-    throw new Error(payload.error || 'Erro de comunicacao.');
-  }
-  return payload;
-}
-
 function renderLogin(message = '') {
-  const deployWarning = IS_GITHUB_PAGES_WITHOUT_API
-    ? 'Backend nao configurado para o GitHub Pages. Configure CDT_API_BASE com a URL publica da API.'
-    : message;
   app.innerHTML = `
     <main class="login-wrap">
       <form class="login-panel" id="login-form">
@@ -87,7 +65,7 @@ function renderLogin(message = '') {
         <label>Telefone
           <input name="phone" inputmode="tel" autocomplete="tel" placeholder="54999990001" required>
         </label>
-        <div class="status">${escapeHtml(deployWarning)}</div>
+        <div class="status">${escapeHtml(message)}</div>
         <button class="btn green" type="submit">Entrar</button>
       </form>
     </main>
@@ -993,6 +971,10 @@ async function renderAdmin() {
               <button class="segmented-btn" type="button" data-member-filter="pool">Sinuca</button>
               <button class="segmented-btn" type="button" data-member-filter="admins">Admins</button>
             </div>
+            <div class="actions form-actions">
+              <button class="btn secondary full" type="button" data-export-backup>Exportar backup JSON</button>
+              <label class="btn secondary full import-backup">Importar backup JSON<input data-import-backup type="file" accept="application/json" hidden></label>
+            </div>
           </div>
           <div class="member-card-list">${members.map(memberCard).join('')}</div>
           <p class="empty" data-member-empty hidden>Nenhum membro encontrado.</p>
@@ -1063,6 +1045,7 @@ async function renderAdmin() {
     document.querySelector('.admin-form-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }));
   bindAdminFilters();
+  bindBackupControls();
 }
 
 function memberCard(member) {
@@ -1122,6 +1105,29 @@ function bindAdminFilters() {
     filterButtons.forEach((item) => item.classList.toggle('active', item === button));
     apply();
   }));
+}
+
+function bindBackupControls() {
+  document.querySelector('[data-export-backup]')?.addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(exportClientState(), null, 2)], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `clube-das-tercas-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  });
+  document.querySelector('[data-import-backup]')?.addEventListener('change', async (event) => {
+    const [file] = event.currentTarget.files;
+    if (!file) return;
+    try {
+      const stateBackup = JSON.parse(await file.text());
+      await importClientState(stateBackup);
+      await refreshHome();
+      renderAdmin();
+    } catch (error) {
+      document.querySelector('#member-status').textContent = error.message;
+    }
+  });
 }
 
 async function renderReports() {

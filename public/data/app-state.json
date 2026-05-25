@@ -1,0 +1,263 @@
+{
+  "nowIso": "2026-05-25T12:00:00.000Z",
+  "counters": {
+    "members": 7,
+    "clubTuesdays": 2,
+    "attendance": 1,
+    "charges": 1,
+    "drinks": 1,
+    "drinkLogs": 1,
+    "poolChampionships": 2,
+    "poolTeams": 3,
+    "poolMatches": 1,
+    "dinnerTeams": 1,
+    "notices": 1,
+    "sessions": 1
+  },
+  "members": [
+    {
+      "id": 1,
+      "name": "Eduardo",
+      "phone": "***0001",
+      "birthDate": "1984-05-10",
+      "role": "admin",
+      "isActive": true,
+      "playsPool": true,
+      "notes": "Administrador inicial",
+      "createdAt": "2026-05-25T12:00:00.000Z",
+      "updatedAt": "2026-05-25T12:00:00.000Z",
+      "phoneHash": "7f8a57e23b4f0eb67340b8282e59b1e827fdc3c472f652b76245361cdf1148e9"
+    },
+    {
+      "id": 2,
+      "name": "Contador",
+      "phone": "***0002",
+      "birthDate": "1978-08-15",
+      "role": "accountant",
+      "isActive": true,
+      "playsPool": false,
+      "notes": "Acesso financeiro",
+      "createdAt": "2026-05-25T12:00:00.000Z",
+      "updatedAt": "2026-05-25T12:00:00.000Z",
+      "phoneHash": "abd602e6f62ad045af57a8d68f1ffe96e8e67fcaaecd0ae22537d8871b8d69d0"
+    },
+    {
+      "id": 3,
+      "name": "Samuel",
+      "phone": "***0003",
+      "birthDate": "1991-02-20",
+      "role": "member",
+      "isActive": true,
+      "playsPool": false,
+      "notes": "",
+      "createdAt": "2026-05-25T12:00:00.000Z",
+      "updatedAt": "2026-05-25T12:00:00.000Z",
+      "phoneHash": "509e6b7698ee16fe07177d9786d03632f9db95d9fd17da58ea7f2fcddc25fd48"
+    },
+    {
+      "id": 4,
+      "name": "Ledir",
+      "phone": "***0004",
+      "birthDate": "1989-11-01",
+      "role": "player",
+      "isActive": true,
+      "playsPool": true,
+      "notes": "",
+      "createdAt": "2026-05-25T12:00:00.000Z",
+      "updatedAt": "2026-05-25T12:00:00.000Z",
+      "phoneHash": "8c1a593fee783a42092dbf2b2a684e3310e892139ec1b107fdecbf5375b168bb"
+    },
+    {
+      "id": 5,
+      "name": "Tille",
+      "phone": "***0005",
+      "birthDate": "1988-03-12",
+      "role": "player",
+      "isActive": true,
+      "playsPool": true,
+      "notes": "",
+      "createdAt": "2026-05-25T12:00:00.000Z",
+      "updatedAt": "2026-05-25T12:00:00.000Z",
+      "phoneHash": "7a89faad4360ba66dbe74bd306c0d607b4ca2c36598b3784392eab7023f5a453"
+    },
+    {
+      "id": 6,
+      "name": "Sonir",
+      "phone": "***0006",
+      "birthDate": "1982-09-22",
+      "role": "player",
+      "isActive": true,
+      "playsPool": true,
+      "notes": "",
+      "createdAt": "2026-05-25T12:00:00.000Z",
+      "updatedAt": "2026-05-25T12:00:00.000Z",
+      "phoneHash": "29717c20fca80a5bab2045dea65041c9a79a9e02a4833d2eccc477ad01356cdb"
+    }
+  ],
+  "clubTuesdays": [
+    {
+      "id": 1,
+      "date": "2026-05-26",
+      "status": "open",
+      "createdAt": "2026-05-25T12:00:00.000Z",
+      "updatedAt": "2026-05-25T12:00:00.000Z"
+    }
+  ],
+  "attendance": [],
+  "charges": [],
+  "drinks": [],
+  "drinkLogs": [],
+  "poolChampionships": [
+    {
+      "id": 1,
+      "name": "Campeonato Clube das Tercas 2026",
+      "status": "active",
+      "startDate": "2026-05-26",
+      "endDate": null,
+      "createdAt": "2026-05-25T12:00:00.000Z",
+      "updatedAt": "2026-05-25T12:00:00.000Z"
+    }
+  ],
+  "poolTeams": [
+    {
+      "id": 1,
+      "championshipId": 1,
+      "playerOneId": 4,
+      "playerTwoId": 1,
+      "name": "Ledir & Eduardo",
+      "isActive": true,
+      "createdAt": "2026-05-25T12:00:00.000Z",
+      "updatedAt": "2026-05-25T12:00:00.000Z"
+    },
+    {
+      "id": 2,
+      "championshipId": 1,
+      "playerOneId": 5,
+      "playerTwoId": 6,
+      "name": "Tille & Sonir",
+      "isActive": true,
+      "createdAt": "2026-05-25T12:00:00.000Z",
+      "updatedAt": "2026-05-25T12:00:00.000Z"
+    }
+  ],
+  "poolMatches": [],
+  "dinnerTeams": [],
+  "notices": [],
+  "sessions": [],
+  "seed": {
+    "admin": {
+      "id": 1,
+      "name": "Eduardo",
+      "phone": "***0001",
+      "birthDate": "1984-05-10",
+      "role": "admin",
+      "isActive": true,
+      "playsPool": true,
+      "notes": "Administrador inicial",
+      "createdAt": "2026-05-25T12:00:00.000Z",
+      "updatedAt": "2026-05-25T12:00:00.000Z",
+      "phoneHash": "7f8a57e23b4f0eb67340b8282e59b1e827fdc3c472f652b76245361cdf1148e9"
+    },
+    "accountant": {
+      "id": 2,
+      "name": "Contador",
+      "phone": "***0002",
+      "birthDate": "1978-08-15",
+      "role": "accountant",
+      "isActive": true,
+      "playsPool": false,
+      "notes": "Acesso financeiro",
+      "createdAt": "2026-05-25T12:00:00.000Z",
+      "updatedAt": "2026-05-25T12:00:00.000Z",
+      "phoneHash": "abd602e6f62ad045af57a8d68f1ffe96e8e67fcaaecd0ae22537d8871b8d69d0"
+    },
+    "member": {
+      "id": 3,
+      "name": "Samuel",
+      "phone": "***0003",
+      "birthDate": "1991-02-20",
+      "role": "member",
+      "isActive": true,
+      "playsPool": false,
+      "notes": "",
+      "createdAt": "2026-05-25T12:00:00.000Z",
+      "updatedAt": "2026-05-25T12:00:00.000Z",
+      "phoneHash": "509e6b7698ee16fe07177d9786d03632f9db95d9fd17da58ea7f2fcddc25fd48"
+    },
+    "player": {
+      "id": 4,
+      "name": "Ledir",
+      "phone": "***0004",
+      "birthDate": "1989-11-01",
+      "role": "player",
+      "isActive": true,
+      "playsPool": true,
+      "notes": "",
+      "createdAt": "2026-05-25T12:00:00.000Z",
+      "updatedAt": "2026-05-25T12:00:00.000Z",
+      "phoneHash": "8c1a593fee783a42092dbf2b2a684e3310e892139ec1b107fdecbf5375b168bb"
+    },
+    "playerTwo": {
+      "id": 5,
+      "name": "Tille",
+      "phone": "***0005",
+      "birthDate": "1988-03-12",
+      "role": "player",
+      "isActive": true,
+      "playsPool": true,
+      "notes": "",
+      "createdAt": "2026-05-25T12:00:00.000Z",
+      "updatedAt": "2026-05-25T12:00:00.000Z",
+      "phoneHash": "7a89faad4360ba66dbe74bd306c0d607b4ca2c36598b3784392eab7023f5a453"
+    },
+    "playerThree": {
+      "id": 6,
+      "name": "Sonir",
+      "phone": "***0006",
+      "birthDate": "1982-09-22",
+      "role": "player",
+      "isActive": true,
+      "playsPool": true,
+      "notes": "",
+      "createdAt": "2026-05-25T12:00:00.000Z",
+      "updatedAt": "2026-05-25T12:00:00.000Z",
+      "phoneHash": "29717c20fca80a5bab2045dea65041c9a79a9e02a4833d2eccc477ad01356cdb"
+    },
+    "currentTuesday": {
+      "id": 1,
+      "date": "2026-05-26",
+      "status": "open",
+      "createdAt": "2026-05-25T12:00:00.000Z",
+      "updatedAt": "2026-05-25T12:00:00.000Z"
+    },
+    "championship": {
+      "id": 1,
+      "name": "Campeonato Clube das Tercas 2026",
+      "status": "active",
+      "startDate": "2026-05-26",
+      "endDate": null,
+      "createdAt": "2026-05-25T12:00:00.000Z",
+      "updatedAt": "2026-05-25T12:00:00.000Z"
+    },
+    "teamA": {
+      "id": 1,
+      "championshipId": 1,
+      "playerOneId": 4,
+      "playerTwoId": 1,
+      "name": "Ledir & Eduardo",
+      "isActive": true,
+      "createdAt": "2026-05-25T12:00:00.000Z",
+      "updatedAt": "2026-05-25T12:00:00.000Z"
+    },
+    "teamB": {
+      "id": 2,
+      "championshipId": 1,
+      "playerOneId": 5,
+      "playerTwoId": 6,
+      "name": "Tille & Sonir",
+      "isActive": true,
+      "createdAt": "2026-05-25T12:00:00.000Z",
+      "updatedAt": "2026-05-25T12:00:00.000Z"
+    }
+  }
+}

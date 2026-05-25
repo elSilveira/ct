@@ -28,12 +28,6 @@ jobs:
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
-      - name: Write runtime config
-        run: |
-          cat > public/config.js <<'EOF'
-          window.CDT_API_BASE = "${{ vars.CDT_API_BASE }}";
-          EOF
-
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
