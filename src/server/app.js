@@ -30,11 +30,11 @@ import {
   listMembers,
   listPoolMatches,
   listWeeklyPoolMatches,
-  loginByPhone,
   logout,
   rejectPoolMatch,
   removeDrink,
   removePoolMatch,
+  removePoolTeam,
   setChargeStatus,
   setTuesdayStatus,
   submitPoolResult,
@@ -46,6 +46,11 @@ import {
   updatePoolMatch,
   upsertAttendance
 } from '../domain/model.js';
+import {
+  applyPhonePrivacy,
+  assertUniquePhoneHash,
+  loginByProtectedPhone
+} from './phone-privacy.js';
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -125,7 +130,7 @@ export async function handleApiRequest({
 }
 
 const ROUTES = [
-  route('POST', '/api/auth/login', true, true, ({ state, body }) => loginByPhone(state, body.phone)),
+  route('POST', '/api/auth/login', true, true, ({ state, body }) => loginByProtectedPhone(state, body.phone)),
   route('POST', '/api/auth/logout', false, true, ({ state, request }) => ({ loggedOut: logout(state, readBearerToken(request)) })),
   route('GET', '/api/auth/me', false, false, ({ currentMember }) => currentMember),
   route('GET', '/api/home', false, false, ({ state, currentMember }) => getHomeData(state, currentMember.id)),
@@ -134,9 +139,21 @@ const ROUTES = [
     includeInactive: query.get('includeInactive') === 'true',
     all: query.get('all') === 'true'
   })),
-  route('POST', '/api/members', false, true, ({ state, currentMember, body }) => createMember(state, currentMember.id, body)),
+  route('POST', '/api/members', false, true, ({ state, currentMember, body }) => {
+    assertUniquePhoneHash(state, body.phone, null, body.isActive !== false);
+    const member = createMember(state, currentMember.id, body);
+    return applyPhonePrivacy(member, body.phone);
+  }),
   route('GET', '/api/members/:id', false, false, ({ state, params }) => state.members.find((member) => member.id === Number(params.id)) ?? null),
-  route('PUT', '/api/members/:id', false, true, ({ state, currentMember, params, body }) => updateMember(state, currentMember.id, params.id, body)),
+  route('PUT', '/api/members/:id', false, true, ({ state, currentMember, params, body }) => {
+    if (body.phone !== undefined) {
+      const existing = state.members.find((member) => member.id === Number(params.id));
+      assertUniquePhoneHash(state, body.phone, Number(params.id), body.isActive ?? existing?.isActive ?? true);
+      const member = updateMember(state, currentMember.id, params.id, body);
+      return applyPhonePrivacy(member, body.phone);
+    }
+    return updateMember(state, currentMember.id, params.id, body);
+  }),
   route('PATCH', '/api/members/:id/status', false, true, ({ state, currentMember, params, body }) => updateMember(state, currentMember.id, params.id, { isActive: body.isActive })),
 
   route('GET', '/api/club-tuesdays', false, true, ({ state, query }) => listClubTuesdays(state, {
@@ -186,8 +203,12 @@ const ROUTES = [
 
   route('GET', '/api/pool/championships', false, false, ({ state }) => state.poolChampionships),
   route('POST', '/api/pool/championships', false, true, ({ state, currentMember, body }) => createPoolChampionship(state, currentMember.id, body)),
-  route('GET', '/api/pool/teams', false, false, ({ state, query }) => state.poolTeams.filter((team) => !query.get('championshipId') || team.championshipId === Number(query.get('championshipId')))),
+  route('GET', '/api/pool/teams', false, false, ({ state, query }) => state.poolTeams.filter((team) => (
+    (!query.get('championshipId') || team.championshipId === Number(query.get('championshipId'))) &&
+    (query.get('includeInactive') === 'true' || team.isActive !== false)
+  ))),
   route('POST', '/api/pool/teams', false, true, ({ state, currentMember, body }) => createPoolTeam(state, currentMember.id, body)),
+  route('DELETE', '/api/pool/teams/:id', false, true, ({ state, currentMember, params }) => removePoolTeam(state, currentMember.id, params.id)),
   route('GET', '/api/pool/matches', false, false, ({ state }) => listPoolMatches(state)),
   route('GET', '/api/pool/weekly/:clubTuesdayId', false, false, ({ state, params }) => listWeeklyPoolMatches(state, params.clubTuesdayId)),
   route('POST', '/api/pool/matches', false, true, ({ state, currentMember, body }) => createPoolMatch(state, currentMember.id, body)),

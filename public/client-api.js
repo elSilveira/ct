@@ -30,6 +30,7 @@ import {
   rejectPoolMatch,
   removeDrink,
   removePoolMatch,
+  removePoolTeam,
   setChargeStatus,
   setTuesdayStatus,
   submitPoolResult,
@@ -151,8 +152,12 @@ const ROUTES = [
   route('POST', '/api/dinner-teams', false, true, ({ state, currentMember, body }) => createDinnerTeam(state, currentMember.id, body)),
   route('GET', '/api/pool/championships', false, false, ({ state }) => state.poolChampionships),
   route('POST', '/api/pool/championships', false, true, ({ state, currentMember, body }) => createPoolChampionship(state, currentMember.id, body)),
-  route('GET', '/api/pool/teams', false, false, ({ state, query }) => state.poolTeams.filter((team) => !query.get('championshipId') || team.championshipId === Number(query.get('championshipId')))),
+  route('GET', '/api/pool/teams', false, false, ({ state, query }) => state.poolTeams.filter((team) => (
+    (!query.get('championshipId') || team.championshipId === Number(query.get('championshipId'))) &&
+    (query.get('includeInactive') === 'true' || team.isActive !== false)
+  ))),
   route('POST', '/api/pool/teams', false, true, ({ state, currentMember, body }) => createPoolTeam(state, currentMember.id, body)),
+  route('DELETE', '/api/pool/teams/:id', false, true, ({ state, currentMember, params }) => removePoolTeam(state, currentMember.id, params.id)),
   route('GET', '/api/pool/matches', false, false, ({ state }) => listPoolMatches(state)),
   route('GET', '/api/pool/weekly/:clubTuesdayId', false, false, ({ state, params }) => listWeeklyPoolMatches(state, params.clubTuesdayId)),
   route('POST', '/api/pool/matches', false, true, ({ state, currentMember, body }) => createPoolMatch(state, currentMember.id, body)),

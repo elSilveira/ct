@@ -18,8 +18,10 @@ import {
   listDrinkRowsForTuesday,
   getMonthlyDrinkReport,
   createPoolMatch,
+  createPoolTeam,
   updatePoolMatch,
   removePoolMatch,
+  removePoolTeam,
   submitPoolResult,
   approvePoolMatch,
   listWeeklyPoolMatches,
@@ -265,6 +267,49 @@ test('weekly pool matches appear only while scheduled/open and can be changed or
   });
   removePoolMatch(state, admin.id, second.id);
   assert.equal(listWeeklyPoolMatches(state, tuesday.id).length, 0);
+});
+
+test('pool teams can be removed without deleting historical confirmed matches', () => {
+  const state = createInitialState('2026-05-25T12:00:00.000Z');
+  const admin = state.seed.admin;
+  const championship = state.seed.championship;
+  const tuesday = getCurrentTuesday(state);
+  const teamA = state.seed.teamA;
+  const teamB = state.seed.teamB;
+  const teamC = createPoolTeam(state, admin.id, {
+    championshipId: championship.id,
+    playerOneId: state.seed.playerTwo.id,
+    playerTwoId: state.seed.admin.id,
+    name: 'Tille & Eduardo'
+  });
+
+  const confirmed = createPoolMatch(state, admin.id, {
+    championshipId: championship.id,
+    clubTuesdayId: tuesday.id,
+    teamAId: teamA.id,
+    teamBId: teamB.id
+  });
+  submitPoolResult(state, admin.id, confirmed.id, { teamAPoints: 2, teamBPoints: 1 });
+
+  const open = createPoolMatch(state, admin.id, {
+    championshipId: championship.id,
+    clubTuesdayId: tuesday.id,
+    teamAId: teamB.id,
+    teamBId: teamC.id
+  });
+
+  const removed = removePoolTeam(state, admin.id, teamB.id);
+
+  assert.equal(removed.isActive, false);
+  assert.equal(state.poolMatches.find((match) => match.id === confirmed.id).status, 'confirmed');
+  assert.equal(state.poolMatches.find((match) => match.id === open.id).status, 'cancelled');
+  assert.equal(getPoolRanking(state, championship.id).some((row) => row.teamId === teamB.id), false);
+  assert.throws(() => createPoolMatch(state, admin.id, {
+    championshipId: championship.id,
+    clubTuesdayId: tuesday.id,
+    teamAId: teamA.id,
+    teamBId: teamB.id
+  }), /inativa/i);
 });
 
 test('dinner teams and notices are tied to Tuesdays and visible on home rules', () => {

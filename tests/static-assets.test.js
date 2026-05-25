@@ -63,6 +63,7 @@ test('SPA assets expose the expected app shell hooks', async () => {
   assert.match(script, /data-consumption-filter/);
   assert.match(script, /data-edit-member/);
   assert.match(script, /data-remove-match/);
+  assert.match(script, /data-remove-team/);
   assert.match(styles, /\.bottom-nav/);
   assert.match(styles, /\.home-shell/);
   assert.match(styles, /\.next-tuesday-card/);

@@ -1,8 +1,8 @@
 import { createHttpServer } from './app.js';
-import { loadState, saveState } from './store.js';
+import { loadState, resolveDataFilePath, saveState } from './store.js';
 
 const PORT = Number(process.env.PORT ?? 3000);
-const DATA_FILE = process.env.DATA_FILE ?? 'data/app-state.json';
+const DATA_FILE = resolveDataFilePath();
 
 const state = await loadState(DATA_FILE);
 const server = createHttpServer({

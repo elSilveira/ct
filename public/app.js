@@ -466,7 +466,20 @@ function poolAdminForms(championship, teams) {
         <button class="btn green" type="submit">Criar jogo</button>
       </form>
     </article>
+    <article class="card">
+      <h2>Duplas ativas</h2>
+      <div class="stack">${teams.map(poolTeamRow).join('') || '<p class="empty">Nenhuma dupla ativa.</p>'}</div>
+    </article>
     </section>
+  `;
+}
+
+function poolTeamRow(team) {
+  return `
+    <div class="row">
+      <strong>${escapeHtml(team.name)}</strong>
+      <button class="btn danger" type="button" data-remove-team="${team.id}">Remover</button>
+    </div>
   `;
 }
 
@@ -497,6 +510,11 @@ function bindPoolForms() {
   });
   document.querySelectorAll('[data-remove-match]').forEach((button) => button.addEventListener('click', async () => {
     await api(`/api/pool/matches/${button.dataset.removeMatch}`, { method: 'DELETE' });
+    await refreshHome();
+    renderPool();
+  }));
+  document.querySelectorAll('[data-remove-team]').forEach((button) => button.addEventListener('click', async () => {
+    await api(`/api/pool/teams/${button.dataset.removeTeam}`, { method: 'DELETE' });
     await refreshHome();
     renderPool();
   }));

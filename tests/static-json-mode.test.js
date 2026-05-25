@@ -18,6 +18,7 @@ test('project is configured for static GitHub Pages mode', async () => {
   assert.match(clientApi, /crypto\.subtle\.digest/);
   assert.match(clientApi, /exportClientState/);
   assert.match(clientApi, /importClientState/);
+  assert.doesNotMatch(clientApi, /DATA_FILE/);
 });
 
 test('static seed stores phone hashes instead of raw mobile numbers', async () => {

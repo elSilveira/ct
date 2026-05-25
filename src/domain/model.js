@@ -514,11 +514,30 @@ export function createPoolTeam(state, actorId, data) {
   });
 }
 
+export function removePoolTeam(state, actorId, teamId) {
+  requireAdmin(state, actorId);
+  const team = requireExisting(state.poolTeams, teamId, 'Dupla');
+  team.isActive = false;
+  team.updatedAt = now(state);
+  for (const match of state.poolMatches) {
+    if (
+      match.status === 'open' &&
+      (match.teamAId === team.id || match.teamBId === team.id)
+    ) {
+      match.status = 'cancelled';
+      match.updatedAt = now(state);
+    }
+  }
+  return team;
+}
+
 export function createPoolMatch(state, actorId, data) {
   requireAdmin(state, actorId);
   const championship = requireExisting(state.poolChampionships, data.championshipId, 'Campeonato');
   const teamA = requireExisting(state.poolTeams, data.teamAId, 'Dupla A');
   const teamB = requireExisting(state.poolTeams, data.teamBId, 'Dupla B');
+  requireActivePoolTeam(teamA, 'Dupla A');
+  requireActivePoolTeam(teamB, 'Dupla B');
   if (teamA.championshipId !== championship.id || teamB.championshipId !== championship.id) {
     throw userError('As duplas precisam pertencer ao campeonato informado.', 400);
   }
@@ -559,6 +578,8 @@ export function updatePoolMatch(state, actorId, matchId, data) {
   const nextTeamBId = data.teamBId ? Number(data.teamBId) : match.teamBId;
   const teamA = requireExisting(state.poolTeams, nextTeamAId, 'Dupla A');
   const teamB = requireExisting(state.poolTeams, nextTeamBId, 'Dupla B');
+  requireActivePoolTeam(teamA, 'Dupla A');
+  requireActivePoolTeam(teamB, 'Dupla B');
   if (teamA.id === teamB.id) {
     throw userError('Uma dupla nao pode jogar contra ela mesma.', 400);
   }
@@ -920,6 +941,12 @@ function requireExisting(collection, id, label) {
     throw userError(`${label} nao encontrado.`, 404);
   }
   return item;
+}
+
+function requireActivePoolTeam(team, label) {
+  if (team.isActive === false) {
+    throw userError(`${label} esta inativa.`, 409);
+  }
 }
 
 function findById(collection, id) {

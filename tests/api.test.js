@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import { createHttpServer } from '../src/server/app.js';
 import { createInitialState } from '../src/domain/model.js';
+import { protectStatePhones } from '../src/server/phone-privacy.js';
 
 async function withServer(run) {
   const state = createInitialState('2026-05-25T12:00:00.000Z');
@@ -48,6 +49,25 @@ test('API logs in by phone and blocks protected routes without a token', async (
     assert.equal(home.payload.member.name, 'Eduardo');
     assert.equal(home.payload.tuesday.date, '2026-05-26');
   });
+});
+
+test('API logs in when persisted state only has masked phones and phone hashes', async () => {
+  const state = protectStatePhones(createInitialState('2026-05-25T12:00:00.000Z'));
+  const server = createHttpServer({ state, persist: false });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address();
+  try {
+    const login = await request(`http://127.0.0.1:${port}`, '/api/auth/login', {
+      method: 'POST',
+      body: { phone: '54999990001' }
+    });
+
+    assert.equal(login.response.status, 200);
+    assert.equal(login.payload.member.phone, '***0001');
+    assert.match(login.payload.member.phoneHash, /^[a-f0-9]{64}$/);
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
 });
 
 test('API persists attendance updates through the protected endpoint', async () => {
@@ -131,5 +151,22 @@ test('API exposes future dinner dates, drink rows, and weekly pool match managem
       token
     });
     assert.equal(removed.payload.status, 'cancelled');
+
+    const team = await request(baseUrl, '/api/pool/teams', {
+      method: 'POST',
+      token,
+      body: { championshipId: 1, playerOneId: 1, playerTwoId: 4, name: 'Eduardo & Ledir 2' }
+    });
+    assert.equal(team.response.status, 200);
+
+    const teamRemoved = await request(baseUrl, `/api/pool/teams/${team.payload.id}`, {
+      method: 'DELETE',
+      token
+    });
+    assert.equal(teamRemoved.response.status, 200);
+    assert.equal(teamRemoved.payload.isActive, false);
+
+    const activeTeams = await request(baseUrl, '/api/pool/teams', { token });
+    assert.equal(activeTeams.payload.some((item) => item.id === team.payload.id), false);
   });
 });

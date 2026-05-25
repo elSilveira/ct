@@ -26,6 +26,11 @@ npm start
 
 Open `http://localhost:3000`.
 
+The local Node server also uses `public/data/app-state.json` by default. The
+path is resolved from the repository root, so the JSON database stays in Git
+instead of depending on the process working directory. Server-side saves mask
+phone numbers and store only `phoneHash` for login lookup.
+
 Seed phones:
 
 - Admin: `54999990001`
