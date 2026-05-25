@@ -1,5 +1,6 @@
 const app = document.querySelector('#app');
 const API_BASE = String(window.CDT_API_BASE || '').replace(/\/$/, '');
+const IS_GITHUB_PAGES_WITHOUT_API = !API_BASE && window.location.hostname.endsWith('github.io');
 
 const state = {
   token: localStorage.getItem('cdt_token'),
@@ -57,6 +58,9 @@ async function init() {
 }
 
 async function api(path, options = {}) {
+  if (IS_GITHUB_PAGES_WITHOUT_API) {
+    throw new Error('Backend nao configurado. Defina CDT_API_BASE nas variaveis do repositorio com a URL publica da API.');
+  }
   const response = await fetch(`${API_BASE}${path}`, {
     method: options.method || 'GET',
     headers: {
@@ -73,6 +77,9 @@ async function api(path, options = {}) {
 }
 
 function renderLogin(message = '') {
+  const deployWarning = IS_GITHUB_PAGES_WITHOUT_API
+    ? 'Backend nao configurado para o GitHub Pages. Configure CDT_API_BASE com a URL publica da API.'
+    : message;
   app.innerHTML = `
     <main class="login-wrap">
       <form class="login-panel" id="login-form">
@@ -80,7 +87,7 @@ function renderLogin(message = '') {
         <label>Telefone
           <input name="phone" inputmode="tel" autocomplete="tel" placeholder="54999990001" required>
         </label>
-        <div class="status">${escapeHtml(message)}</div>
+        <div class="status">${escapeHtml(deployWarning)}</div>
         <button class="btn green" type="submit">Entrar</button>
       </form>
     </main>

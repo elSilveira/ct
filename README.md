@@ -29,6 +29,8 @@ The repository includes a GitHub Actions workflow at `.github/workflows/pages.ym
 
 For a deployed backend, set the repository variable `CDT_API_BASE` to the public API origin, for example `https://api.example.com`. If it is empty, the SPA calls `/api/*` on the same origin, which is correct for local Node hosting but not enough for GitHub Pages by itself.
 
+Configure it in GitHub at `Settings` -> `Secrets and variables` -> `Actions` -> `Variables`. GitHub Pages cannot run the Node API, so login and all `/api/*` actions require that backend URL.
+
 ## Implementation Notes
 
 - The app is dependency-free for the first local implementation and runs on Node.js 22+.
